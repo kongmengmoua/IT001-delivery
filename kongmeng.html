@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot ภาษาไทย (Voice-Enabled)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&family=Fira+Mono&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .chat-container {
+            width: 410px;
+            height: 650px;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 #4caf5040, 0 2px 12px 0 #0002;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(8px);
+            border: 2.5px solid #4CAF50;
+            position: relative;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: linear-gradient(90deg, #4CAF50 60%, #43e97b 100%);
+            color: white;
+            padding: 18px 0 16px 0;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px #4caf5033;
+            position: relative;
+        }
+        .chat-header::after {
+            content: "🤖";
+            position: absolute;
+            right: 24px;
+            top: 16px;
+            font-size: 1.6rem;
+            opacity: 0.7;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 18px 16px 18px 16px;
+            overflow-y: auto;
+            background: transparent;
+            scrollbar-width: thin;
+            scrollbar-color: #4CAF50 #e0eafc;
+        }
+        .chat-messages::-webkit-scrollbar { width: 7px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #4CAF50; border-radius: 6px; }
+        .message {
+            margin-bottom: 18px;
+            padding: 12px 18px;
+            border-radius: 22px;
+            max-width: 75%;
+            word-break: break-word;
+            font-size: 1.08rem;
+            line-height: 1.6;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+        .user-message {
+            background: linear-gradient(90deg, #c1f7c1 60%, #a8edea 100%);
+            margin-left: auto;
+            border-bottom-right-radius: 7px;
+            color: #2e7d32;
+            border: 1.5px solid #43e97b;
+        }
+        .bot-message {
+            background: linear-gradient(90deg, #f5f7fa 60%, #c3cfe2 100%);
+            margin-right: auto;
+            border-bottom-left-radius: 7px;
+            /* font-family: 'Fira Mono', 'Prompt', Arial, sans-serif; */ /* เอาออกเพื่อให้รองรับหลายภาษาดีขึ้น */
+            color: #333;
+            border: 1.5px solid #b2dfdb;
+        }
+        .chat-input {
+            display: flex;
+            padding: 14px;
+            border-top: 1.5px solid #e0eafc;
+            background: rgba(255,255,255,0.95);
+            align-items: center;
+        }
+        #user-input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 1.5px solid #4CAF50;
+            border-radius: 22px;
+            outline: none;
+            font-size: 1.08rem;
+            font-family: 'Prompt', Arial, sans-serif;
+            background: #f8fff8;
+            transition: border 0.2s;
+        }
+        #user-input:focus {
+            border: 2.5px solid #43e97b;
+            background: #e0fbe0;
+        }
+        #send-button, #mic-button {
+            margin-left: 8px;
+            padding: 12px;
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(90deg, #4CAF50 60%, #43e97b 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.3rem;
+            font-weight: 700;
+            box-shadow: 0 2px 8px #4caf5033;
+            transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #send-button:hover, #mic-button:hover {
+            background: linear-gradient(90deg, #43e97b 60%, #4CAF50 100%);
+            transform: translateY(-2px) scale(1.04);
+        }
+        #mic-button.listening {
+            background: linear-gradient(90deg, #f44336 60%, #ff7961 100%);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 #f4433680; }
+            70% { box-shadow: 0 0 0 10px #f4433600; }
+            100% { box-shadow: 0 0 0 0 #f4433600; }
+        }
+        .typing-indicator { display: flex; align-items: center; margin-bottom: 18px; animation: fadeIn 0.5s; }
+        .typing-indicator span { height: 10px; width: 10px; margin: 0 2px; background-color: #4CAF50; border-radius: 50%; display: inline-block; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+        @media (max-width: 500px) { .chat-container { width: 100vw; height: 100vh; border-radius: 0; } .chat-header { border-radius: 0; } }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            Chatbot ไทย
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- ข้อความจะแสดงที่นี่ -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="พิมพ์หรือกดไมค์เพื่อพูด..." autocomplete="off" />
+            <button id="mic-button" title="กดเพื่อพูด">🎤</button>
+            <button id="send-button" aria-label="ส่ง">🚀</button>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chat-messages');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+            const micButton = document.getElementById('mic-button');
+            let typingIndicator;
+
+            // --- Speech Synthesis (Text-to-Speech) ---
+            const synth = window.speechSynthesis;
+            let voices = [];
+
+            function loadVoices() {
+                voices = synth.getVoices();
+            }
+            // โหลดเสียงเมื่อมีการเปลี่ยนแปลง (สำคัญสำหรับบางเบราว์เซอร์)
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = loadVoices;
+            }
+            loadVoices(); // โหลดครั้งแรก
+
+            function speakText(text) {
+                if (synth.speaking) {
+                    synth.cancel(); // หยุดเสียงที่กำลังพูดอยู่ก่อน
+                }
+                if (!text) return;
+
+                // ลบแท็ก HTML ออกก่อนพูด
+                const cleanText = text.replace(/<[^>]*>?/gm, '');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                
+                // --- Logic การเลือกเสียงอัตโนมัติ ---
+                let targetLang = 'en-US'; // Default
+                if (/[\u0E00-\u0E7F]/.test(cleanText)) targetLang = 'th-TH'; // Thai
+                if (/[\u0E80-\u0EFF]/.test(cleanText)) targetLang = 'lo-LA'; // Lao
+                if (/[\u4E00-\u9FFF]/.test(cleanText)) targetLang = 'zh-CN'; // Chinese
+                
+                const selectedVoice = voices.find(voice => voice.lang === targetLang);
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                } else {
+                    // Fallback to Thai or default if specific language not found
+                    utterance.voice = voices.find(voice => voice.lang === 'th-TH') || voices[0];
+                }
+
+                utterance.pitch = 1;
+                utterance.rate = 1; // สามารถปรับความเร็วได้ที่นี่
+                synth.speak(utterance);
+            }
+
+            // --- Speech Recognition (Speech-to-Text) ---
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'th-TH'; // ตั้งค่าภาษาเริ่มต้นเป็นไทย
+                recognition.interimResults = false;
+
+                micButton.addEventListener('click', () => {
+                    if (micButton.classList.contains('listening')) {
+                        recognition.stop();
+                    } else {
+                        // เปลี่ยนภาษาของ recognition ตามภาษาที่ผู้ใช้อาจจะพูด
+                        // สามารถเพิ่ม logic ที่ซับซ้อนกว่านี้ได้ในอนาคต
+                        // แต่ตอนนี้ใช้ภาษาไทยเป็นหลัก
+                        recognition.lang = 'th-TH';
+                        recognition.start();
+                    }
+                });
+
+                recognition.onstart = () => {
+                    micButton.classList.add('listening');
+                    micButton.innerHTML = "🛑";
+                    micButton.title = "กำลังฟัง... กดอีกครั้งเพื่อหยุด";
+                };
+
+                recognition.onend = () => {
+                    micButton.classList.remove('listening');
+                    micButton.innerHTML = "🎤";
+                    micButton.title = "กดเพื่อพูด";
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    userInput.value = transcript;
+                    // ส่งข้อความโดยอัตโนมัติหลังจากพูดเสร็จ
+                    setTimeout(handleSendMessage, 100);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    addMessage(`ขออภัยครับ เกิดข้อผิดพลาดในการรับเสียง: ${event.error}`, false);
+                };
+
+            } else {
+                micButton.style.display = 'none'; // ซ่อนปุ่มถ้าเบราว์เซอร์ไม่รองรับ
+                console.log('เบราว์เซอร์นี้ไม่รองรับ Speech Recognition API');
+            }
+
+
+            // --- Core Chat Functions ---
+            function addMessage(message, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message', isUser ? 'user-message' : 'bot-message');
+                messageDiv.innerHTML = message; // ใช้ innerHTML เพื่อให้ tag <br> ทำงานได้
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            function showTypingIndicator() {
+                if (!typingIndicator) {
+                    typingIndicator = document.createElement('div');
+                    typingIndicator.classList.add('typing-indicator');
+                    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+                    chatMessages.appendChild(typingIndicator);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }
+
+            function hideTypingIndicator() {
+                if (typingIndicator) {
+                    chatMessages.removeChild(typingIndicator);
+                    typingIndicator = null;
+                }
+            }
+
+            const botResponses = {
+                // ทักทายทั่วไป
+                'สวัสดี': 'สวัสดีครับ! มีอะไรให้ช่วยไหมครับ?',
+                'สวัสดีค่ะ': 'สวัสดีค่ะ! มีอะไรให้ช่วยไหมคะ?',
+                'hello': 'Hello! How can I help you?',
+                'hi': 'Hi there! Need any help?',
+                'ສະບາຍດີ': 'ສະບາຍດີ! ມີຫຍັງໃຫ້ຊ່ວຍບໍ?',
+                '你好': '你好！有什么可以帮您的吗？',
+
+                // ธรรมชาติ/ท่องเที่ยว
+                'แนะนำที่เที่ยวธรรมชาติ': 'ขอแนะนำ “อุทยานแห่งชาติเขาใหญ่”, “น้ำตกเอราวัณ”, หรือ “ดอยอินทนนท์” ครับ',
+                'แนะนำทะเลสวยๆ': 'ลองไปที่เกาะพีพี จ.กระบี่, เกาะสมุย จ.สุราษฎร์ธานี, หรือหัวหินดูสิครับ น้ำใส ทรายสวย',
+                'แนะนำที่เที่ยว': 'คุณสนใจเที่ยวภูเขา ทะเล หรือวัดครับ?',
+                'อยากไปเที่ยว': 'ลองไปเที่ยวเชียงใหม่ ภูเก็ต หรือหลวงพระบางดูไหมครับ?',
+                'ສະຖານທີ່ທ່ອງທ່ຽວ': 'ຫາກທ່ານມັກທ່ຽວທຳມະຊາດ ຂໍແນະນຳ ນ້ຳຕົກຕາດກວງ ຫຼື ພູພຽງຟ້າ ຢູ່ລາວ',
+                'nature travel': 'You can visit Khao Yai National Park, Erawan Waterfall, or Doi Inthanon in Thailand.',
+                '旅游推荐': '你可以去清迈、大皇宫、普吉岛等地旅游。',
+
+                // ธุรกิจ/การเงิน
+                'ธุรกิจอะไรดี': 'ตอนนี้ธุรกิจที่น่าสนใจมีทั้ง Affiliate Marketing, Dropshipping, หรือการสร้างคอนเทนต์ออนไลน์ครับ',
+                'แนะนำธุรกิจ': 'ธุรกิจออนไลน์, ร้านกาแฟ, หรือขายของบนแพลตฟอร์มต่างๆ กำลังได้รับความนิยมครับ',
+                'อยากเริ่มธุรกิจ': 'เริ่มจากสิ่งที่คุณสนใจ ศึกษาตลาด และวางแผนธุรกิจให้ดีครับ',
+                'business idea': 'How about starting an online shop or a digital marketing service?',
+                'ທຸລະກິດ': 'ທ່ານສາມາດເລີ່ມທຸລະກິດອອນລາຍ ຫຼື ຮ້ານກາເຟໄດ້',
+
+                // คำถามทั่วไป
+                'คุณชื่ออะไร': 'ผมชื่อ Chatbot ไทยครับ',
+                'ชื่ออะไร': 'ผมคือ Chatbot ไทยครับ ยินดีที่ได้รู้จัก!',
+                'what is your name': 'My name is Chatbot.',
+                '你叫什么名字': '我叫Chatbot。',
+                'ຊື່ຫຍັງ': 'ຂ້ອຍຊື່ Chatbot!',
+                'คุณคือใคร': 'ผมคือ Chatbot ภาษาไทย พร้อมช่วยเหลือคุณครับ',
+                'who are you': 'I am a multilingual chatbot.',
+                '你是谁': '我是多语言聊天机器人。',
+                'ທ່ານແມ່ນໃຜ': 'ຂ້ອຍແມ່ນ Chatbot ພ້ອມຊ່ວຍເຫຼືອທ່ານ',
+                
+                // อารมณ์/ความรู้สึก
+                'สบายดีไหม': 'ผมเป็นบอทครับ แต่ขอบคุณที่ถามนะ! คุณสบายดีไหมครับ?',
+                'how are you': 'I am a bot, but thank you for asking! How are you?',
+                'ສະບາຍດີບໍ': 'ຂ້ອຍເປັນບອດ ແຕ່ຂອບໃຈທີ່ຖາມ! ທ່ານສະບາຍດີບໍ?',
+                '你好吗': '我是机器人，谢谢你的关心！你好吗？',
+
+                // ขอบคุณ/ลาก่อน
+                'ขอบคุณ': 'ยินดีครับ! มีอะไรให้ช่วยอีกไหมครับ?',
+                'ขอบคุณค่ะ': 'ยินดีค่ะ! มีอะไรให้ช่วยอีกไหมคะ?',
+                'thank you': 'You\'re welcome! Anything else I can do?',
+                '谢谢': '不客气！还有什么需要帮忙的吗？',
+                'ຂອບໃຈ': 'ຍິນດີ! ມີຫຍັງອື່ນໃຫ້ຊ່ວຍບໍ?',
+                'ลาก่อน': 'ลาก่อนครับ! ถ้ามีคำถามอีกยินดีช่วยเสมอนะครับ',
+                'bye': 'Goodbye! See you again.',
+                '再见': '再见！欢迎下次再来。',
+                'ລາກ່ອນ': 'ລາກ່ອນ! ພົບກັນໃໝ່ໄດ້ເມື່ອຕ້ອງການ',
+
+                // เรื่องตลก/บันเทิง
+                'เล่าเรื่องตลก': 'ทำไมไก่ถึงข้ามถนน? เพื่อไปอีกฝั่งหนึ่งไงครับ!',
+                'เล่าเรื่องตลกหน่อย': 'นักคณิตศาสตร์กลัวเลข 7 เพราะ 7 กิน 9 ครับ! (seven ate nine)',
+                'tell me a joke': 'Why did the chicken cross the road? To get to the other side!',
+                '讲个笑话': '为什么鸡要过马路？因为要到对面去！',
+                'ເລົ່າເລື່ອງຕະຫຼົກ': 'ເປັນຫຍັງໄກ່ຈຶ່ງຂ້າມຖະໜົນ? ເພາະຢາກໄປຝັ່ງຕົງກັນຂ້າມ!',
+                
+                // --- หมวดหมู่ใหม่: อาหารและสูตรอาหาร ---
+                'ผัดไทย': 'ผัดไทยเป็นอาหารไทยยอดนิยม ประกอบด้วยเส้นจันท์, กุ้ง, เต้าหู้, ถั่วงอก, และไข่ ปรุงรสด้วยน้ำมะขามเปียกครับ',
+                'ต้มยำกุ้ง': 'ต้มยำกุ้งเป็นซุปรสจัดจ้าน มีส่วนผสมหลักคือ กุ้ง, เห็ด, ข่า, ตะไคร้, ใบมะกรูด และพริกครับ',
+                'ส้มตำ': 'ส้มตำเป็นสลัดรสแซ่บ ทำจากมะละกอดิบ, มะเขือเทศ, ถั่วฝักยาว, พริก, กระเทียม, และปรุงรสด้วยน้ำปลาร้าหรือน้ำปลาครับ',
+                'อยากกินอะไรอร่อยๆ': 'ลองทานผัดไทย, ต้มยำกุ้ง, หรือแกงเขียวหวานดูไหมครับ? อร่อยทุกอย่างเลย!',
+                'ช่วยบอกสูตรอาหาร': 'อยากได้สูตรอาหารอะไรครับ? เช่น ผัดไทย, ต้มยำกุ้ง, ส้มตำ ฯลฯ',
+
+                // --- หมวดหมู่ใหม่: ความรู้ทั่วไปและวัฒนธรรมไทย ---
+                'เมืองหลวงของไทย': 'กรุงเทพมหานคร (Bangkok) คือเมืองหลวงของประเทศไทยครับ',
+                'สกุลเงินของไทย': 'สกุลเงินของไทยคือ บาท (Baht) ครับ ตัวย่อคือ THB',
+                'สงกรานต์คืออะไร': 'สงกรานต์คือเทศกาลปีใหม่ไทยครับ ตรงกับวันที่ 13-15 เมษายนของทุกปี เป็นวันที่ครอบครัวรวมตัวกันและมีการเล่นน้ำเพื่อความสนุกสนานครับ',
+                'ลอยกระทงคืออะไร': 'ลอยกระทงเป็นประเพณีที่จัดขึ้นในคืนวันเพ็ญเดือน 12 เพื่อเป็นการขอขมาพระแม่คงคา และลอยความทุกข์โศกออกไปกับกระทงครับ',
+
+                // --- หมวดหมู่ใหม่: ความสามารถของบอท ---
+                'คุณทำอะไรได้บ้าง': 'ผมสามารถตอบคำถามทั่วไป, แนะนำที่เที่ยว, ให้ข้อมูลวัฒนธรรมไทย, เล่าเรื่องตลก, และอื่นๆ อีกเล็กน้อยครับ ลองถามมาได้เลย!',
+                'ทำอะไรได้บ้าง': 'ผมตอบคำถามได้หลายเรื่องเลยครับ เช่น เรื่องเที่ยว, อาหาร, หรือจะให้เล่าเรื่องตลกก็ได้นะ!',
+
+                // --- หมวดหมู่ใหม่: สร้างสรรค์และให้กำลังใจ ---
+                'แต่งกลอนให้หน่อย': 'ท้องฟ้าสดใสในวันนี้<br>ขอให้เธอมีแต่สุขใจ<br>ไม่ว่าจะทำอะไร<br>ขอให้สำเร็จทุกอย่างเอย',
+                'ขอคำคม': '"ความสำเร็จไม่ได้มาจากการไม่เคยล้ม แต่มาจากการลุกขึ้นได้ในทุกครั้งที่ล้ม" สู้ๆ นะครับ!',
+            };
+
+            function getBotResponse(userMessage) {
+                const message = userMessage.toLowerCase().trim();
+                const now = new Date();
+                
+                // 1. ตรวจสอบคำถามเกี่ยวกับเวลา/วันที่ก่อน (Dynamic Response)
+                if (message.includes('วันนี้วันอะไร')) { const days = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']; return `วันนี้คือวัน${days[now.getDay()]}ครับ`; }
+                if (message.includes('กี่โมง')) { return `ขณะนี้เวลา ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น. ครับ`; }
+                if (message.includes('what time is it')) { return `It is now ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`; }
+                if (message.includes('现在几点')) { return `现在是 ${now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`; }
+                
+                // 2. ตรวจสอบคำถามที่ตรงกันเป๊ะๆ (Exact Match)
+                if (botResponses[message]) { return botResponses[message]; }
+                
+                // 3. ถ้าไม่ตรง ให้หาจากคีย์เวิร์ด (Partial Match)
+                for (const key in botResponses) { if (message.includes(key.toLowerCase())) { return botResponses[key]; } }
+                
+                // 4. ถ้าไม่เจอทั้งหมด ให้ตอบกลับแบบทั่วไป
+                const genericReplies = [
+                    'ขออภัยครับ/ຂໍໂທດ/Sorry/对不起 ผมยังไม่เข้าใจคำถามนี้ กรุณาถามใหม่หรือระบุรายละเอียดเพิ่มเติมได้ไหมครับ?',
+                    'ขอบคุณสำหรับคำถามครับ! ตอนนี้ผมยังตอบเรื่องนี้ไม่ได้ แต่จะพัฒนาให้ดีขึ้นนะครับ',
+                    'ขออภัยครับ ผมยังไม่มีข้อมูลเรื่องนี้ ลองถามเรื่องอื่นได้เลยครับ',
+                    'Sorry, I do not have an answer for that yet. Please try another question.',
+                    'ຂໍໂທດ ຂ້ອຍຍັງບໍ່ຮູ້ຄຳຕອບໃນຫົວຂໍ້ນີ້'
+                ];
+                return genericReplies[Math.floor(Math.random() * genericReplies.length)];
+            }
+
+            function handleSendMessage() {
+                const message = userInput.value.trim();
+                if (message) {
+                    addMessage(message, true);
+                    userInput.value = '';
+                    showTypingIndicator();
+                    
+                    setTimeout(() => {
+                        hideTypingIndicator();
+                        const botResponse = getBotResponse(message);
+                        addMessage(botResponse, false);
+                        speakText(botResponse); // <<<<<<< เพิ่มการเรียกใช้เสียงพูดตรงนี้
+                    }, 800 + Math.random() * 500);
+                }
+            }
+
+            // --- Event Listeners and Initialisation ---
+            sendButton.addEventListener('click', handleSendMessage);
+            userInput.addEventListener('keypress', e => e.key === 'Enter' && handleSendMessage());
+
+            // ข้อความต้อนรับ
+            setTimeout(() => {
+                const welcomeMessage = '🌱 สวัสดีครับ! ผมคือ Chatbot ภาษาไทย พร้อมช่วยเหลือคุณได้หลายภาษา ลองพิมพ์หรือกดที่ไอคอนไมโครโฟนเพื่อพูดคุยได้เลยครับ Hello! I am a Thai chatbot, ready to help you in multiple languages. Try typing or tapping the microphone icon to chat !' ;
+                addMessage(welcomeMessage, false);
+                speakText(welcomeMessage);
+            }, 600);
+
+            userInput.focus();
+        }); 
+    </script>
+</body>
+</html>
